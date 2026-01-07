@@ -149,15 +149,28 @@ void cipher_decrypt_block(const uint8_t *input, uint8_t *output, const uint8_t *
     memcpy(state, input, BLOCK_SIZE);
     generate_round_keys(key, round_keys);
     
-    // Reverse final round
-    permute_bytes(state);
+    // Reverse final round (was: SubBytes, PermBytes)
+    // Need to apply inverse permutation first
+    uint8_t inv_perm[16];
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        inv_perm[PERM_TABLE[i]] = i;
+    }
+    uint8_t temp[BLOCK_SIZE];
+    memcpy(temp, state, BLOCK_SIZE);
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        state[i] = temp[inv_perm[i]];
+    }
     substitute_bytes(state, INV_SBOX);
     
     // 9 main rounds in reverse
     for (int round = 9; round >= 1; round--) {
         add_round_key(state, round_keys[round]);
         inv_mix_columns(state);
-        permute_bytes(state);
+        // Apply inverse permutation
+        memcpy(temp, state, BLOCK_SIZE);
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+            state[i] = temp[inv_perm[i]];
+        }
         substitute_bytes(state, INV_SBOX);
     }
     
@@ -172,8 +185,9 @@ int cbc_encrypt(const uint8_t *plaintext, size_t plaintext_len,
                 const uint8_t *key, const uint8_t *iv,
                 uint8_t **ciphertext, size_t *ciphertext_len) {
     
-    // Calculate padded length
-    size_t padded_len = plaintext_len + (BLOCK_SIZE - (plaintext_len % BLOCK_SIZE));
+    // Calculate padding needed (PKCS7 requires at least 1 byte, full block if aligned)
+    size_t padding_needed = BLOCK_SIZE - (plaintext_len % BLOCK_SIZE);
+    size_t padded_len = plaintext_len + padding_needed;
     
     // Allocate memory for padded plaintext
     uint8_t *padded_plaintext = malloc(padded_len);
@@ -181,8 +195,11 @@ int cbc_encrypt(const uint8_t *plaintext, size_t plaintext_len,
         return -1;
     }
     
+    // Copy plaintext and add padding
     memcpy(padded_plaintext, plaintext, plaintext_len);
-    add_pkcs7_padding(padded_plaintext + plaintext_len, plaintext_len, BLOCK_SIZE);
+    for (size_t i = 0; i < padding_needed; i++) {
+        padded_plaintext[plaintext_len + i] = (uint8_t)padding_needed;
+    }
     
     // Allocate ciphertext
     *ciphertext = malloc(padded_len);

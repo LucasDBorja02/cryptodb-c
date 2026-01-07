@@ -41,13 +41,31 @@ int db_store_encrypted_data(PGconn *conn, const char *name,
     bytes_to_hex(ciphertext, ciphertext_len, ciphertext_hex);
     bytes_to_hex(iv, IV_SIZE, iv_hex);
     
-    // Prepare SQL statement
-    const char *paramValues[3] = { name, ciphertext_hex, iv_hex };
+    // Check if record already exists
+    const char *checkParams[1] = { name };
+    PGresult *checkRes = PQexecParams(conn,
+        "SELECT name FROM encrypted_data WHERE name = $1",
+        1, NULL, checkParams, NULL, NULL, 0);
     
-    PGresult *res = PQexecParams(conn,
-        "INSERT INTO encrypted_data (name, ciphertext, iv) VALUES ($1, $2, $3) "
-        "ON CONFLICT (name) DO UPDATE SET ciphertext = $2, iv = $3, created_at = CURRENT_TIMESTAMP",
-        3, NULL, paramValues, NULL, NULL, 0);
+    int record_exists = (PQresultStatus(checkRes) == PGRES_TUPLES_OK && PQntuples(checkRes) > 0);
+    PQclear(checkRes);
+    
+    // Prepare SQL statement based on whether record exists
+    const char *paramValues[3] = { name, ciphertext_hex, iv_hex };
+    PGresult *res;
+    
+    if (record_exists) {
+        // Update existing record
+        res = PQexecParams(conn,
+            "UPDATE encrypted_data SET ciphertext = $2, iv = $3, created_at = CURRENT_TIMESTAMP WHERE name = $1",
+            3, NULL, paramValues, NULL, NULL, 0);
+        fprintf(stderr, "Warning: Updating existing record '%s'\n", name);
+    } else {
+        // Insert new record
+        res = PQexecParams(conn,
+            "INSERT INTO encrypted_data (name, ciphertext, iv) VALUES ($1, $2, $3)",
+            3, NULL, paramValues, NULL, NULL, 0);
+    }
     
     ExecStatusType status = PQresultStatus(res);
     PQclear(res);
