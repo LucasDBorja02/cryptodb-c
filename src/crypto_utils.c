@@ -56,17 +56,22 @@ int remove_pkcs7_padding(uint8_t *data, size_t data_len, size_t *unpadded_len) {
     return 0;
 }
 
-// Convert bytes to hex string
+// Convert bytes to hex string (assumes hex_str has at least len*2+1 bytes)
 void bytes_to_hex(const uint8_t *bytes, size_t len, char *hex_str) {
     for (size_t i = 0; i < len; i++) {
-        sprintf(hex_str + (i * 2), "%02x", bytes[i]);
+        snprintf(hex_str + (i * 2), 3, "%02x", bytes[i]);
     }
     hex_str[len * 2] = '\0';
 }
 
-// Convert hex string to bytes
+// Convert hex string to bytes (assumes hex_str has at least len*2 characters)
 void hex_to_bytes(const char *hex_str, uint8_t *bytes, size_t len) {
     for (size_t i = 0; i < len; i++) {
-        sscanf(hex_str + (i * 2), "%2hhx", &bytes[i]);
+        unsigned int byte;
+        if (sscanf(hex_str + (i * 2), "%2x", &byte) == 1) {
+            bytes[i] = (uint8_t)byte;
+        } else {
+            bytes[i] = 0;
+        }
     }
 }

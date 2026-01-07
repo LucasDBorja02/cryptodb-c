@@ -118,17 +118,24 @@ int main(int argc, char *argv[]) {
         // Prompt for key
         printf("Enter decryption key (64 hex characters): ");
         fflush(stdout);
-        char key_hex[KEY_SIZE * 2 + 1];
-        if (scanf("%64s", key_hex) != 1) {
+        char key_hex[KEY_SIZE * 2 + 2]; // +2 for null terminator and newline
+        if (fgets(key_hex, sizeof(key_hex), stdin) == NULL) {
             fprintf(stderr, "Failed to read key\n");
             db_disconnect(conn);
             return 1;
         }
         
+        // Remove trailing newline if present
+        size_t len = strlen(key_hex);
+        if (len > 0 && key_hex[len - 1] == '\n') {
+            key_hex[len - 1] = '\0';
+            len--;
+        }
+        
         // Validate hex input
-        if (strlen(key_hex) != KEY_SIZE * 2) {
+        if (len != KEY_SIZE * 2) {
             fprintf(stderr, "Invalid key length. Expected %d characters, got %zu\n", 
-                    KEY_SIZE * 2, strlen(key_hex));
+                    KEY_SIZE * 2, len);
             db_disconnect(conn);
             return 1;
         }
