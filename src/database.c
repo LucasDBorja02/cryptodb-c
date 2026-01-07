@@ -120,9 +120,27 @@ int db_retrieve_encrypted_data(PGconn *conn, const char *name,
         return -1;
     }
     
+    // Validate hex string lengths
+    size_t ciphertext_hex_len = strlen(ciphertext_hex);
+    size_t iv_hex_len = strlen(iv_hex);
+    
+    if (ciphertext_hex_len != *ciphertext_len * 2 || iv_hex_len != IV_SIZE * 2) {
+        fprintf(stderr, "Invalid hex data length in database\n");
+        free(*ciphertext);
+        free(*iv);
+        PQclear(res);
+        return -1;
+    }
+    
     // Convert hex to bytes
-    hex_to_bytes(ciphertext_hex, *ciphertext, *ciphertext_len);
-    hex_to_bytes(iv_hex, *iv, IV_SIZE);
+    if (hex_to_bytes(ciphertext_hex, *ciphertext, *ciphertext_len) != 0 ||
+        hex_to_bytes(iv_hex, *iv, IV_SIZE) != 0) {
+        fprintf(stderr, "Invalid hex data in database\n");
+        free(*ciphertext);
+        free(*iv);
+        PQclear(res);
+        return -1;
+    }
     
     PQclear(res);
     return 0;

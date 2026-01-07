@@ -65,13 +65,24 @@ void bytes_to_hex(const uint8_t *bytes, size_t len, char *hex_str) {
 }
 
 // Convert hex string to bytes (assumes hex_str has at least len*2 characters)
-void hex_to_bytes(const char *hex_str, uint8_t *bytes, size_t len) {
+// Returns 0 on success, -1 on error
+int hex_to_bytes(const char *hex_str, uint8_t *bytes, size_t len) {
     for (size_t i = 0; i < len; i++) {
+        char c1 = hex_str[i * 2];
+        char c2 = hex_str[i * 2 + 1];
+        
+        // Validate hex characters
+        if (!((c1 >= '0' && c1 <= '9') || (c1 >= 'a' && c1 <= 'f') || (c1 >= 'A' && c1 <= 'F')) ||
+            !((c2 >= '0' && c2 <= '9') || (c2 >= 'a' && c2 <= 'f') || (c2 >= 'A' && c2 <= 'F'))) {
+            return -1;
+        }
+        
         unsigned int byte;
         if (sscanf(hex_str + (i * 2), "%2x", &byte) == 1) {
             bytes[i] = (uint8_t)byte;
         } else {
-            bytes[i] = 0;
+            return -1;
         }
     }
+    return 0;
 }

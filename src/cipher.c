@@ -51,6 +51,11 @@ static const uint8_t PERM_TABLE[16] = {
     0, 13, 10, 7, 4, 1, 14, 11, 8, 5, 2, 15, 12, 9, 6, 3
 };
 
+// Precomputed inverse permutation table
+static const uint8_t INV_PERM_TABLE[16] = {
+    0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11
+};
+
 // Round key generation from master key
 static void generate_round_keys(const uint8_t *key, uint8_t round_keys[10][16]) {
     // Simple key schedule: XOR key with round constants
@@ -75,6 +80,15 @@ static void permute_bytes(uint8_t *state) {
     memcpy(temp, state, BLOCK_SIZE);
     for (int i = 0; i < BLOCK_SIZE; i++) {
         state[i] = temp[PERM_TABLE[i]];
+    }
+}
+
+// Inverse permutation layer
+static void inv_permute_bytes(uint8_t *state) {
+    uint8_t temp[BLOCK_SIZE];
+    memcpy(temp, state, BLOCK_SIZE);
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        state[i] = temp[INV_PERM_TABLE[i]];
     }
 }
 
@@ -150,27 +164,14 @@ void cipher_decrypt_block(const uint8_t *input, uint8_t *output, const uint8_t *
     generate_round_keys(key, round_keys);
     
     // Reverse final round (was: SubBytes, PermBytes)
-    // Need to apply inverse permutation first
-    uint8_t inv_perm[16];
-    for (int i = 0; i < BLOCK_SIZE; i++) {
-        inv_perm[PERM_TABLE[i]] = i;
-    }
-    uint8_t temp[BLOCK_SIZE];
-    memcpy(temp, state, BLOCK_SIZE);
-    for (int i = 0; i < BLOCK_SIZE; i++) {
-        state[i] = temp[inv_perm[i]];
-    }
+    inv_permute_bytes(state);
     substitute_bytes(state, INV_SBOX);
     
     // 9 main rounds in reverse
     for (int round = 9; round >= 1; round--) {
         add_round_key(state, round_keys[round]);
         inv_mix_columns(state);
-        // Apply inverse permutation
-        memcpy(temp, state, BLOCK_SIZE);
-        for (int i = 0; i < BLOCK_SIZE; i++) {
-            state[i] = temp[inv_perm[i]];
-        }
+        inv_permute_bytes(state);
         substitute_bytes(state, INV_SBOX);
     }
     

@@ -151,7 +151,11 @@ int main(int argc, char *argv[]) {
         }
         
         uint8_t key[KEY_SIZE];
-        hex_to_bytes(key_hex, key, KEY_SIZE);
+        if (hex_to_bytes(key_hex, key, KEY_SIZE) != 0) {
+            fprintf(stderr, "Invalid hex format in key\n");
+            db_disconnect(conn);
+            return 1;
+        }
         
         // Retrieve encrypted data
         uint8_t *ciphertext;
